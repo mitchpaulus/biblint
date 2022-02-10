@@ -1,6 +1,6 @@
 lexer grammar BibLexer;
 
-WORD : [a-zA-Z0-9-]+ ;
+WORD : [a-zA-Z0-9_-]+ ;
 AT : '@' ;
 COMMA : ',' ;
 EQUALS : '=' -> pushMode(INFIELD);
