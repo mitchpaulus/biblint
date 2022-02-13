@@ -5,7 +5,7 @@ namespace biblint;
 
 public class BibFileListener : BibParserBaseListener
 {
-    public List<BibEntry> entries = new List<BibEntry>();
+    public List<BibEntry> entries = new();
     public override void EnterBibentry(BibParser.BibentryContext context)
     {
         string? entryType = context.WORD(0).GetText();

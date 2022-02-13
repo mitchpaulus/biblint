@@ -7,16 +7,74 @@ public class Program
 {
     public static void Main(string[] argv)
     {
-        AntlrInputStream inputStream = new AntlrFileStream(argv[0]);
+        bool format = false;
+        bool sort = false;
+
+        List<string> files = new();
+
+        for (var i = 0; i < argv.Length; i++)
+        {
+            var arg = argv[i];
+
+            if (arg == "-h" || arg == "--help")
+            {
+                Console.Write("Usage: biblint [options] [file]\n");
+                Console.Write("Options:\n");
+                Console.Write("  -h, --help    Show this help message and exit\n");
+                Console.Write("  -v, --version Show version information and exit\n");
+                return;
+            }
+            else if (arg == "-f" || arg == "--format")
+            {
+                format = true;
+            }
+            else if (arg == "-s" || arg == "--sort")
+            {
+                sort = true;
+            }
+            else if (arg == "-v" || arg == "--version")
+            {
+                Console.Write("0.1\n");
+                return;
+            }
+            else
+            {
+                files.Add(arg);
+            }
+        }
+
+        if (files.Count == 0)
+        {
+            files.Add("-");
+        }
+
+        foreach (string file in files)
+        {
+            if (file == "-")
+            {
+                using Stream standardInputStream = Console.OpenStandardInput();
+                Process(standardInputStream, format, sort);
+            }
+            else
+            {
+                using FileStream stream = new(file, FileMode.Open);
+                Process(stream, format, sort);
+            }
+        }
+    }
+
+    public static void Process(Stream stream, bool format, bool sort)
+    {
+        AntlrInputStream inputStream = new(stream);
 
         BibErrorListener errorListener = new();
 
-        BibLexer lexer = new BibLexer(inputStream);
+        BibLexer lexer = new(inputStream);
         lexer.RemoveErrorListeners();
         lexer.AddErrorListener(errorListener);
 
-        CommonTokenStream tokenStream = new CommonTokenStream(lexer);
-        BibParser parser = new BibParser(tokenStream);
+        CommonTokenStream tokenStream = new(lexer);
+        BibParser parser = new(tokenStream);
         parser.RemoveErrorListeners();
         parser.AddErrorListener(errorListener);
 
@@ -24,8 +82,8 @@ public class Program
 
         if (errorListener.LexerErrors.Any() || errorListener.ParserErrors.Any())
         {
-            foreach (var error in errorListener.LexerErrors) Console.Write($"{error.Print()}\n");
-            foreach (var error in errorListener.ParserErrors) Console.Write($"{error.Print()}\n");
+            foreach (var error in errorListener.LexerErrors)  Console.Error.Write($"{error.Print()}\n");
+            foreach (var error in errorListener.ParserErrors) Console.Error.Write($"{error.Print()}\n");
             return;
         }
 
@@ -33,9 +91,14 @@ public class Program
         ParseTreeWalker walker = new();
         walker.Walk(listener, file);
 
-        foreach (var entry in listener.entries.OrderBy(entry => entry.Id))
+        if (sort) listener.entries.Sort((a, b) => string.Compare(a.Id, b.Id, StringComparison.Ordinal));
+
+        if (format)
         {
-            Console.Write(entry.PrettyPrint());
+            foreach (var entry in listener.entries)
+            {
+                Console.Write(entry.PrettyPrint());
+            }
         }
     }
 }
