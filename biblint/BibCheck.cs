@@ -57,11 +57,43 @@ public class DuplicateKeyCheck : BibCheck
     }
 }
 
+public class IssnFormatCheck : BibCheck
+{
+    public List<BibWarning> Check(List<BibEntry> entries)
+    {
+        List<BibWarning> warnings = new();
+        foreach (var field in entries.Fields().Where(field => field.Match("issn")))
+        {
+            string trimmedValue = field.FieldValue.StripBraces().Trim();
+            if (!Regex.IsMatch(trimmedValue, "^[0-9]{4}-[0-9]{4}$"))
+            {
+                warnings.Add(new BibWarning($"The ISSN number '{trimmedValue}' is in non standard format (xxxx-xxxx).", field.FieldContext.Start.Line));
+            }
+        }
+
+        return warnings;
+    }
+}
+
 public class Checks
 {
     public static List<BibCheck> List = new()
     {
         new QuoteCheck(),
         new DuplicateKeyCheck(),
+        new IssnFormatCheck(),
     };
+}
+
+public static class Extensions
+{
+    public static List<BibField> Fields(this List<BibEntry> entries) =>
+        entries.SelectMany(entry => entry.Fields).ToList();
+
+    public static string StripBraces(this string input)
+    {
+        if (input.Length < 2) return input;
+        if (input[0] == '{' && input[^1] == '}') return input.Substring(1, input.Length - 2);
+        return input;
+    }
 }

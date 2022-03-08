@@ -101,6 +101,8 @@ public class BibField
         FieldContext = fieldContext;
     }
 
+    public bool Match(string fieldName) => string.Equals(FieldName, fieldName, StringComparison.InvariantCultureIgnoreCase);
+
     public string PrettyPrint()
     {
         return $"{FieldName.ToLower()} = {FieldValue}";
