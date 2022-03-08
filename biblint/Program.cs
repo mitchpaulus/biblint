@@ -10,6 +10,8 @@ public class Program
         bool format = false;
         bool sort = false;
 
+        List<string> toRemove = new();
+
         List<string> files = new();
 
         for (var i = 0; i < argv.Length; i++)
@@ -27,6 +29,13 @@ public class Program
             else if (arg == "-f" || arg == "--format")
             {
                 format = true;
+            }
+            else if (arg == "-r" || arg == "--remove")
+            {
+                if (i + 1 >= argv.Length)
+                    throw new InvalidOperationException("Not enough arguments provided to remove option");
+                toRemove.Add(argv[i + 1]);
+                i++;
             }
             else if (arg == "-s" || arg == "--sort")
             {
@@ -53,17 +62,17 @@ public class Program
             if (file == "-")
             {
                 using Stream standardInputStream = Console.OpenStandardInput();
-                Process(standardInputStream, format, sort);
+                Process(standardInputStream, format, sort, toRemove);
             }
             else
             {
                 using FileStream stream = new(file, FileMode.Open);
-                Process(stream, format, sort);
+                Process(stream, format, sort, toRemove);
             }
         }
     }
 
-    public static void Process(Stream stream, bool format, bool sort)
+    public static void Process(Stream stream, bool format, bool sort, List<string> toRemove)
     {
         AntlrInputStream inputStream = new(stream);
 
@@ -87,11 +96,14 @@ public class Program
             return;
         }
 
-        BibFileListener listener = new();
+        BibFileListener listener = new(toRemove);
         ParseTreeWalker walker = new();
         walker.Walk(listener, file);
 
-        if (sort) listener.entries.Sort((a, b) => string.Compare(a.Id, b.Id, StringComparison.Ordinal));
+        var warnings = Checks.List.SelectMany(check => check.Check(listener.entries)).OrderBy(warning => warning.Line).ToList();
+        foreach (var warning in warnings) Console.Error.Write($"{warning.Line}: {warning.Warning}\n");
+
+        if (sort) listener.entries.Sort((a, b) => string.Compare(a.Id, b.Id, StringComparison.CurrentCultureIgnoreCase));
 
         if (format)
         {
