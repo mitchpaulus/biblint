@@ -9,6 +9,7 @@ public class Program
     {
         bool format = false;
         bool sort = false;
+        bool checkUrls = false;
 
         List<string> toRemove = new();
 
@@ -18,33 +19,44 @@ public class Program
         {
             var arg = argv[i];
 
-            if (arg == "-h" || arg == "--help")
+            if (arg is "-h" or "--help")
             {
                 Console.Write("Usage: biblint [options] [file]\n");
                 Console.Write("Options:\n");
-                Console.Write("  -h, --help    Show this help message and exit\n");
-                Console.Write("  -v, --version Show version information and exit\n");
+                Console.Write("  -f, --format         Apply formatting.\n");
+                Console.Write("  -h, --help           Show this help message and exit.\n");
+                Console.Write("  -r, --remove <field> Remove the named field from the output. Can be used multiple times.\n");
+                Console.Write("  -s, --sort           Sort the output by the entry id.\n");
+                Console.Write("  -v, --version        Show version information and exit.\n");
+                Console.Write("  -u, --urls           Check URLs");
+                Console.Write("\n");
+                Console.Write("If no file is specified, or the file is '-', the input is read from standard input.\n");
+
                 return;
             }
-            else if (arg == "-f" || arg == "--format")
+            else if (arg is "-f" or "--format")
             {
                 format = true;
             }
-            else if (arg == "-r" || arg == "--remove")
+            else if (arg is "-r" or "--remove")
             {
                 if (i + 1 >= argv.Length)
                     throw new InvalidOperationException("Not enough arguments provided to remove option");
                 toRemove.Add(argv[i + 1]);
                 i++;
             }
-            else if (arg == "-s" || arg == "--sort")
+            else if (arg is "-s" or "--sort")
             {
                 sort = true;
             }
-            else if (arg == "-v" || arg == "--version")
+            else if (arg is "-v" or "--version")
             {
                 Console.Write("0.1\n");
                 return;
+            }
+            else if (arg is "-u" or "--urls")
+            {
+                checkUrls = true;
             }
             else
             {
@@ -54,7 +66,8 @@ public class Program
 
         if (files.Count == 0)
         {
-            files.Add("-");
+            // Search for any files with the extension .bib
+            files = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.bib").ToList();
         }
 
         foreach (string file in files)
@@ -62,17 +75,17 @@ public class Program
             if (file == "-")
             {
                 using Stream standardInputStream = Console.OpenStandardInput();
-                Process(standardInputStream, format, sort, toRemove);
+                Process(standardInputStream, format, sort, toRemove, checkUrls);
             }
             else
             {
                 using FileStream stream = new(file, FileMode.Open);
-                Process(stream, format, sort, toRemove);
+                Process(stream, format, sort, toRemove, checkUrls);
             }
         }
     }
 
-    public static void Process(Stream stream, bool format, bool sort, List<string> toRemove)
+    public static void Process(Stream stream, bool format, bool sort, List<string> toRemove, bool checkUrls)
     {
         AntlrInputStream inputStream = new(stream);
 
@@ -100,7 +113,7 @@ public class Program
         ParseTreeWalker walker = new();
         walker.Walk(listener, file);
 
-        var warnings = Checks.List.SelectMany(check => check.Check(listener.entries)).OrderBy(warning => warning.Line).ToList();
+        var warnings = Checks.List(checkUrls).SelectMany(check => check.Check(listener.entries)).OrderBy(warning => warning.Line).ToList();
         foreach (var warning in warnings) Console.Error.Write($"{warning.Line}: {warning.Warning}\n");
 
         if (sort) listener.entries.Sort((a, b) => string.Compare(a.Id, b.Id, StringComparison.CurrentCultureIgnoreCase));
