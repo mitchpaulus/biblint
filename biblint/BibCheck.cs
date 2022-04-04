@@ -200,6 +200,68 @@ public class NoDoiOrUrlCheck : BibCheck
     }
 }
 
+public class DuplicateTitleCheck : BibCheck
+{
+
+    public List<BibWarning> Check(List<BibEntry> entries)
+    {
+        List<BibWarning> warnings = new();
+        // Keep case insensitive Dictionary of titles and lines they occur on
+        Dictionary<string, List<int>> titles = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var entry in entries)
+        {
+            var titleField = entry.Fields.FirstOrDefault(field => field.FieldName.ToLower() == "title");
+            if (titleField != null)
+            {
+                var title = titleField.FieldValue.StripBraces().Trim();
+                if (titles.ContainsKey(title))
+                {
+                    titles[title].Add(titleField.FieldContext.Start.Line);
+                }
+                else
+                {
+                    titles.Add(title, new List<int> { titleField.FieldContext.Start.Line });
+                }
+            }
+        }
+
+        // Check for duplicate titles
+        foreach (var title in titles)
+        {
+            if (title.Value.Count > 1)
+            {
+                warnings.Add(new BibWarning($"The title '{title.Key}' occurs on lines {string.Join(", ", title.Value)}.", title.Value[0]));
+            }
+        }
+
+        return warnings;
+    }
+}
+
+public class IntegerMonthCheck : BibCheck
+{
+
+    public List<BibWarning> Check(List<BibEntry> entries)
+    {
+        List<BibWarning> warnings = new();
+        foreach (var field in entries.Fields().Where(field => field.FieldName.ToLower() == "month"))
+        {
+            string trimmedValue = field.FieldValue.StripBraces().Trim();
+            // Verify that the value is an integer between 1 and 12
+            var possibleValues = new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" };
+            if (!possibleValues.Contains(trimmedValue))
+            {
+                warnings.Add(new BibWarning($"The month '{trimmedValue}' is not a valid integer month.", field.FieldContext.Start.Line));
+            }
+        }
+
+        return warnings;
+    }
+
+
+}
+
 public class Checks
 {
     public static List<BibCheck> List(bool checkUrls)
@@ -212,6 +274,8 @@ public class Checks
             new PageRangeCheck(),
             new DuplicateDoiUrl(),
             new NoDoiOrUrlCheck(),
+            new DuplicateTitleCheck(),
+            new IntegerMonthCheck(),
         };
 
         if (checkUrls) list.Add(new UrlCheck());
@@ -226,8 +290,16 @@ public static class Extensions
 
     public static string StripBraces(this string input)
     {
-        if (input.Length < 2) return input;
-        if (input[0] == '{' && input[^1] == '}') return input.Substring(1, input.Length - 2);
-        return input;
+        while (true)
+        {
+            if (input.Length < 2) return input;
+            if (input[0] == '{' && input[^1] == '}')
+            {
+                var newInput = input.Substring(1, input.Length - 2);
+                input = newInput;
+                continue;
+            }
+            return input;
+        }
     }
 }
