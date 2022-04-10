@@ -79,8 +79,35 @@ public class Program
             }
             else
             {
-                using FileStream stream = new(file, FileMode.Open);
-                Process(stream, format, sort, toRemove, checkUrls);
+                try
+                {
+                    using FileStream stream = new(file, FileMode.Open);
+                    Process(stream, format, sort, toRemove, checkUrls);
+                }
+                catch (ArgumentException)
+                {
+                    Console.Error.Write($"Could not open file '{file}'. Are there illegal characters in the name?\n");
+                    Environment.ExitCode = 1;
+                    return;
+                }
+                catch (NotSupportedException)
+                {
+                    Console.Error.Write($"Could not open file '{file}'. Path possibly refers to non-file device in non-NTFS environment.\n");
+                    Environment.ExitCode = 1;
+                    return;
+                }
+                catch (FileNotFoundException)
+                {
+                    Console.Error.Write($"Could not find file '{file}'.\n");
+                    Environment.ExitCode = 1;
+                    return;
+                }
+                catch (Exception)
+                {
+                    Console.Error.Write($"Error opening file '{file}'.\n");
+                    Environment.ExitCode = 1;
+                    return;
+                }
             }
         }
     }
